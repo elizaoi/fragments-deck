@@ -28,7 +28,7 @@ type ArchiveState = {
 }
 
 const suits: CardSuit[] = ['речь', 'жест', 'пауза', 'письмо', 'взгляд']
-const storageKey = 'fragments-archive-state-v2'
+const storageKey = 'fragments-archive-state-v4'
 
 const baseFolders: Folder[] = [
   { id: 'folder-1', name: 'Фигуры речи' },
@@ -105,6 +105,8 @@ function App() {
   const [activeFolderId, setActiveFolderId] = useState(initialArchive.activeFolderId)
   const [selectedCardId, setSelectedCardId] = useState(initialArchive.selectedCardId)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
 
   const activeFolder = folders.find((folder) => folder.id === activeFolderId)
   const visibleCards = cards.filter((card) => card.folderId === activeFolderId)
@@ -152,8 +154,9 @@ function App() {
   function deleteSelectedCard() {
     if (!selectedCard) return
 
+    const nextSelectedCard = cards.find((card) => card.id !== selectedCard.id)
     setCards((current) => current.filter((card) => card.id !== selectedCard.id))
-    setSelectedCardId(cards.find((card) => card.id !== selectedCard.id)?.id ?? '')
+    setSelectedCardId(nextSelectedCard?.id ?? '')
   }
 
   function addFolder() {
@@ -163,12 +166,33 @@ function App() {
     }
     setFolders((current) => [...current, nextFolder])
     setActiveFolderId(nextFolder.id)
+    setEditingFolderId(nextFolder.id)
   }
 
   function updateFolderName(folderId: string, name: string) {
     setFolders((current) =>
       current.map((folder) => (folder.id === folderId ? { ...folder, name } : folder)),
     )
+  }
+
+  function deleteFolder(folderId: string) {
+    if (folders.length <= 1) return
+
+    const fallbackFolder = folders.find((folder) => folder.id !== folderId)
+    if (!fallbackFolder) return
+
+    setFolders((current) => current.filter((folder) => folder.id !== folderId))
+    setCards((current) => current.filter((card) => card.folderId !== folderId))
+    setActiveFolderId((current) => (current === folderId ? fallbackFolder.id : current))
+    setEditingFolderId((current) => (current === folderId ? null : current))
+    setSelectedCardId((current) => {
+      const selectedStillExists = cards.some(
+        (card) => card.id === current && card.folderId !== folderId,
+      )
+      return selectedStillExists
+        ? current
+        : cards.find((card) => card.folderId !== folderId)?.id ?? ''
+    })
   }
 
   function startCardDrag(
@@ -192,8 +216,7 @@ function App() {
     event.currentTarget.setPointerCapture(event.pointerId)
 
     function moveCard(moveEvent: PointerEvent) {
-      const nextX =
-        moveEvent.clientX - rect.left + board.scrollLeft - offsetX
+      const nextX = moveEvent.clientX - rect.left + board.scrollLeft - offsetX
       const nextY = moveEvent.clientY - rect.top + board.scrollTop - offsetY
 
       updateCard(card.id, {
@@ -223,41 +246,99 @@ function App() {
   }
 
   return (
-    <main className="archive-app">
+    <main className={sidebarCollapsed ? 'archive-app sidebar-collapsed' : 'archive-app'}>
       <aside className="sidebar" aria-label="Папки архива">
-        <div className="brand-block">
-          <p>Архив колоды</p>
-          <h1>Фрагменты</h1>
+        <div className="sidebar-top">
+          <div className="brand-block">
+            <p>Архив колоды</p>
+            <h1>Фрагменты речи</h1>
+          </div>
+          <button
+            className="icon-button collapse-button"
+            type="button"
+            aria-label={sidebarCollapsed ? 'Развернуть папки' : 'Свернуть папки'}
+            onClick={() => setSidebarCollapsed((current) => !current)}
+          >
+            {sidebarCollapsed ? '›' : '‹'}
+          </button>
         </div>
 
-        <button className="text-button" type="button" onClick={addFolder}>
-          + Папка
+        <button className="text-button add-folder" type="button" onClick={addFolder}>
+          <span>+ Папка</span>
+          <strong>+</strong>
         </button>
 
         <nav className="folder-list" aria-label="Список папок">
-          {folders.map((folder) => (
-            <button
-              className={folder.id === activeFolderId ? 'folder active' : 'folder'}
-              data-folder-id={folder.id}
-              key={folder.id}
-              type="button"
-              onClick={() => setActiveFolderId(folder.id)}
-            >
-              <span>{folder.name}</span>
-              <small>{cardCountByFolder[folder.id] ?? 0}</small>
-            </button>
-          ))}
+          {folders.map((folder) => {
+            const isEditing = editingFolderId === folder.id
+
+            return (
+              <div
+                className={folder.id === activeFolderId ? 'folder-row active' : 'folder-row'}
+                data-folder-id={folder.id}
+                key={folder.id}
+              >
+                <button
+                  className="folder"
+                  type="button"
+                  onClick={() => setActiveFolderId(folder.id)}
+                >
+                  <span className="folder-initial">{folder.name.slice(0, 1)}</span>
+                  <span className="folder-name">{folder.name}</span>
+                  <small>{cardCountByFolder[folder.id] ?? 0}</small>
+                </button>
+
+                <div className="folder-actions">
+                  <button
+                    className="mini-button"
+                    type="button"
+                    aria-label={`Переименовать папку ${folder.name}`}
+                    onClick={() =>
+                      setEditingFolderId((current) =>
+                        current === folder.id ? null : folder.id,
+                      )
+                    }
+                  >
+                    Имя
+                  </button>
+                  <button
+                    className="mini-button danger"
+                    type="button"
+                    aria-label={`Удалить папку ${folder.name}`}
+                    disabled={folders.length <= 1}
+                    onClick={() => deleteFolder(folder.id)}
+                  >
+                    Удалить
+                  </button>
+                </div>
+
+                {isEditing ? (
+                  <input
+                    className="folder-name-input"
+                    aria-label={`Новое название папки ${folder.name}`}
+                    value={folder.name}
+                    onBlur={() => setEditingFolderId(null)}
+                    onChange={(event) => updateFolderName(folder.id, event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') setEditingFolderId(null)
+                    }}
+                  />
+                ) : null}
+              </div>
+            )
+          })}
         </nav>
       </aside>
 
       <section className="workspace" aria-label="Рабочий канвас">
         <header className="topbar">
           <div>
-            <p>В разработке</p>
+            <p>Канвас папки</p>
             <h2>{activeFolder?.name}</h2>
           </div>
           <div className="toolbar">
             <span>{cards.length} карт всего</span>
+            <span>{visibleCards.length} здесь</span>
             <button type="button" onClick={addCard}>
               + Карта
             </button>
@@ -285,11 +366,12 @@ function App() {
                     <span className="suit">{card.suit}</span>
                     <h3>{card.title}</h3>
                     <p>{card.question}</p>
-                    <small>перетащи карту или открой в панели</small>
+                    <small>лицевая сторона</small>
                   </div>
                   <div className="card-face card-back">
                     <span className="suit">оборот</span>
                     <p>{card.backText}</p>
+                    <small>заметка автора</small>
                   </div>
                 </div>
               </article>
@@ -302,12 +384,32 @@ function App() {
         {selectedCard ? (
           <>
             <div className="inspector-heading">
-              <p>Редактор</p>
+              <p>Редактор карты</p>
               <h2>{selectedCard.title}</h2>
+              <span className="side-status">
+                Сейчас на канвасе: {selectedCard.flipped ? 'оборот' : 'лицевая сторона'}
+              </span>
+            </div>
+
+            <div className="side-switch" aria-label="Переключение стороны карты">
+              <button
+                className={!selectedCard.flipped ? 'active' : ''}
+                type="button"
+                onClick={() => updateCard(selectedCard.id, { flipped: false })}
+              >
+                Лицевая
+              </button>
+              <button
+                className={selectedCard.flipped ? 'active' : ''}
+                type="button"
+                onClick={() => updateCard(selectedCard.id, { flipped: true })}
+              >
+                Оборот
+              </button>
             </div>
 
             <label>
-              Название
+              Название карты
               <input
                 value={selectedCard.title}
                 onChange={(event) =>
@@ -317,7 +419,7 @@ function App() {
             </label>
 
             <label>
-              Текст лицевой стороны
+              Что видят игроки
               <textarea
                 rows={5}
                 value={selectedCard.question}
@@ -328,7 +430,7 @@ function App() {
             </label>
 
             <label>
-              Оборотная сторона
+              Оборот / заметка автора
               <textarea
                 rows={5}
                 value={selectedCard.backText}
@@ -338,50 +440,47 @@ function App() {
               />
             </label>
 
-            <label>
-              Масть
-              <select
-                value={selectedCard.suit}
-                onChange={(event) =>
-                  updateCard(selectedCard.id, {
-                    suit: event.target.value as CardSuit,
-                  })
-                }
-              >
-                {suits.map((suit) => (
-                  <option key={suit} value={suit}>
-                    {suit}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="field-grid">
+              <label>
+                Масть
+                <select
+                  value={selectedCard.suit}
+                  onChange={(event) =>
+                    updateCard(selectedCard.id, {
+                      suit: event.target.value as CardSuit,
+                    })
+                  }
+                >
+                  {suits.map((suit) => (
+                    <option key={suit} value={suit}>
+                      {suit}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label>
-              Папка
-              <select
-                value={selectedCard.folderId}
-                onChange={(event) => {
-                  updateCard(selectedCard.id, { folderId: event.target.value })
-                  setActiveFolderId(event.target.value)
-                }}
-              >
-                {folders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label>
+                Папка
+                <select
+                  value={selectedCard.folderId}
+                  onChange={(event) => {
+                    updateCard(selectedCard.id, { folderId: event.target.value })
+                    setActiveFolderId(event.target.value)
+                  }}
+                >
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-            <label>
-              Название активной папки
-              <input
-                value={activeFolder?.name ?? ''}
-                onChange={(event) =>
-                  updateFolderName(activeFolderId, event.target.value)
-                }
-              />
-            </label>
+            <div className="gameplay-note">
+              <strong>Как это читать:</strong>
+              <span>лицевая сторона — карточка для игры; оборот — авторская заметка, правило или расшифровка.</span>
+            </div>
 
             <div className="inspector-actions">
               <button
@@ -390,10 +489,10 @@ function App() {
                   updateCard(selectedCard.id, { flipped: !selectedCard.flipped })
                 }
               >
-                Перевернуть
+                {selectedCard.flipped ? 'Показать лицевую' : 'Показать оборот'}
               </button>
               <button className="danger" type="button" onClick={deleteSelectedCard}>
-                Удалить
+                Удалить карту
               </button>
             </div>
           </>
