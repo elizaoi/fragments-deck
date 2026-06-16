@@ -111,6 +111,7 @@ function App() {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false)
 
   const activeFolder = folders.find((folder) => folder.id === activeFolderId)
   const visibleCards = cards.filter((card) => card.folderId === activeFolderId)
@@ -153,6 +154,7 @@ function App() {
 
     setCards((current) => [...current, newCard])
     setSelectedCardId(newCard.id)
+    setMobileInspectorOpen(true)
   }
 
   function deleteSelectedCard() {
@@ -346,6 +348,13 @@ function App() {
             <button type="button" onClick={addCard}>
               + Карта
             </button>
+            <button
+              className="mobile-editor-button"
+              type="button"
+              onClick={() => setMobileInspectorOpen(true)}
+            >
+              Редактор
+            </button>
           </div>
         </header>
 
@@ -384,15 +393,27 @@ function App() {
         </div>
       </section>
 
-      <aside className="inspector" aria-label="Редактор карты">
+      <aside
+        className={mobileInspectorOpen ? 'inspector mobile-open' : 'inspector'}
+        aria-label="Редактор карты"
+      >
         {selectedCard ? (
           <>
             <div className="inspector-heading">
-              <p>Редактор карты</p>
-              <h2>{selectedCard.title}</h2>
-              <span className="side-status">
-                Сейчас на канвасе: {selectedCard.flipped ? 'оборот' : 'лицевая сторона'}
-              </span>
+              <div>
+                <p>Редактор карты</p>
+                <h2>{selectedCard.title}</h2>
+                <span className="side-status">
+                  Сейчас на канвасе: {selectedCard.flipped ? 'оборот' : 'лицевая сторона'}
+                </span>
+              </div>
+              <button
+                className="sheet-toggle"
+                type="button"
+                onClick={() => setMobileInspectorOpen((current) => !current)}
+              >
+                {mobileInspectorOpen ? 'Свернуть' : 'Открыть'}
+              </button>
             </div>
 
             <div className="side-switch" aria-label="Переключение стороны карты">
