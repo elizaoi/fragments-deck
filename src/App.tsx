@@ -97,6 +97,10 @@ function loadArchiveState(): ArchiveState {
   }
 }
 
+function getFolderInitial(name: string) {
+  return Array.from(name.trim())[0]?.toLocaleUpperCase('ru-RU') ?? '•'
+}
+
 function App() {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const initialArchive = useMemo(() => loadArchiveState(), [])
@@ -283,7 +287,7 @@ function App() {
                   type="button"
                   onClick={() => setActiveFolderId(folder.id)}
                 >
-                  <span className="folder-initial">{folder.name.slice(0, 1)}</span>
+                  <span className="folder-initial">{getFolderInitial(folder.name)}</span>
                   <span className="folder-name">{folder.name}</span>
                   <small>{cardCountByFolder[folder.id] ?? 0}</small>
                 </button>

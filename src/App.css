@@ -523,14 +523,42 @@
 @media (max-width: 640px) {
   .archive-app,
   .archive-app.sidebar-collapsed {
+    height: 100dvh;
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
-    max-height: 260px;
+    gap: 10px;
+    max-height: 228px;
+    padding: 12px;
     border-right: none;
     border-bottom: 1px solid var(--line);
+  }
+
+  .sidebar-top {
+    align-items: center;
+  }
+
+  .brand-block h1 {
+    max-width: none;
+    font-size: 23px;
+  }
+
+  .brand-block p {
+    margin-bottom: 4px;
+    font-size: 10px;
+  }
+
+  .collapse-button {
+    flex-basis: 32px;
+    min-height: 32px;
+  }
+
+  .add-folder {
+    align-self: flex-start;
+    min-height: 34px;
+    padding: 0 12px;
   }
 
   .sidebar-collapsed .sidebar {
@@ -538,15 +566,108 @@
   }
 
   .folder-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+
+  .folder-row {
+    flex: 0 0 180px;
+    padding: 6px;
+  }
+
+  .folder-actions {
+    padding-left: 0;
+  }
+
+  .folder {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+
+  .folder-initial {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+
+  .mini-button {
+    min-height: 24px;
+    padding: 0 6px;
+    font-size: 10px;
   }
 
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .topbar h2 {
+    font-size: 24px;
   }
 
   .toolbar {
     flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .toolbar button {
+    min-height: 34px;
+  }
+
+  .board-canvas {
+    width: 1700px;
+    height: 1220px;
+  }
+
+  .deck-card {
+    width: 140px;
+    height: 204px;
+  }
+
+  .card-face {
+    gap: 9px;
+    padding: 13px;
+  }
+
+  .card-face h3 {
+    font-size: 20px;
+  }
+
+  .card-face p {
+    font-size: 12px;
+    -webkit-line-clamp: 5;
+  }
+
+  .inspector {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-height: 46dvh;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 8px;
+  }
+
+  .inspector-heading h2 {
+    font-size: 23px;
+  }
+
+  .side-status,
+  .gameplay-note {
+    font-size: 12px;
+  }
+
+  .field-grid,
+  .inspector-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .inspector textarea {
+    min-height: 82px;
   }
 }
