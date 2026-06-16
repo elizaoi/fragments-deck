@@ -403,6 +403,7 @@
   gap: 16px;
   padding: 22px;
   border-left: 1px solid var(--line);
+  z-index: 20;
 }
 
 .inspector-heading {
@@ -594,7 +595,7 @@
   }
 
   .folder-row {
-    flex: 0 0 136px;
+    flex: 0 0 148px;
     gap: 4px;
     padding: 4px;
   }
@@ -622,6 +623,7 @@
 
   .folder-name {
     font-size: 11px;
+    line-height: 1.1;
   }
 
   .folder small {
@@ -650,8 +652,8 @@
     display: -webkit-box;
     max-width: calc(100vw - 20px);
     overflow: hidden;
-    font-size: 19px;
-    line-height: 1.05;
+    font-size: clamp(17px, 4.2vw, 19px);
+    line-height: 1.12;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
@@ -674,6 +676,17 @@
 
   .mobile-editor-button {
     display: inline-flex;
+    min-width: 0;
+    padding: 0 9px;
+    border-color: var(--line-strong);
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.38);
+    font-size: 10px;
+  }
+
+  .mobile-editor-button:hover {
+    color: var(--paper);
+    background: var(--ink);
   }
 
   .board-canvas {
@@ -727,6 +740,7 @@
     border-radius: 8px;
     overflow: hidden;
     transition: max-height 0.22s ease, padding 0.22s ease;
+    z-index: 30;
   }
 
   .inspector.mobile-open {

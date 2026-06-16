@@ -351,9 +351,10 @@ function App() {
             <button
               className="mobile-editor-button"
               type="button"
+              aria-label="Открыть редактор карты"
               onClick={() => setMobileInspectorOpen(true)}
             >
-              Редактор
+              Править
             </button>
           </div>
         </header>
