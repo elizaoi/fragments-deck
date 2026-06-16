@@ -1,80 +1,409 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-function App() {
-  return (
-    <main className="page-shell">
-      <header className="site-header">
-        <a className="brand" href="#top" aria-label="На главную">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>Название проекта</span>
-        </a>
-        <nav aria-label="Основная навигация">
-          <a href="#about">О проекте</a>
-          <a href="#cards">Карточки</a>
-          <a href="#contact">Контакты</a>
-        </nav>
-      </header>
+type Folder = {
+  id: string
+  name: string
+}
 
-      <section className="hero-section" id="top">
-        <div className="hero-copy">
-          <p className="placeholder-label">Каркас сайта</p>
-          <h1>Название карточной игры</h1>
-          <p>
-            Здесь позже появится короткое описание: для кого игра, какой у нее
-            тон и почему в нее хочется сыграть.
-          </p>
-          <div className="hero-actions">
-            <a className="button primary" href="#about">
-              Начать
-            </a>
-            <a className="button secondary" href="#cards">
-              Смотреть блоки
-            </a>
+type CardSuit = 'речь' | 'жест' | 'пауза' | 'письмо' | 'взгляд'
+
+type DeckCard = {
+  id: string
+  folderId: string
+  title: string
+  question: string
+  backText: string
+  suit: CardSuit
+  x: number
+  y: number
+  flipped: boolean
+}
+
+type ArchiveState = {
+  folders: Folder[]
+  cards: DeckCard[]
+  activeFolderId: string
+  selectedCardId: string
+}
+
+const suits: CardSuit[] = ['речь', 'жест', 'пауза', 'письмо', 'взгляд']
+const storageKey = 'fragments-archive-state-v2'
+
+const baseFolders: Folder[] = [
+  { id: 'folder-1', name: 'Фигуры речи' },
+  { id: 'folder-2', name: 'Ожидание' },
+  { id: 'folder-3', name: 'Разрыв' },
+  { id: 'folder-4', name: 'Жесты' },
+  { id: 'folder-5', name: 'Письма' },
+]
+
+const prompts = [
+  'Что ты называешь близостью, когда говоришь о другом человеке?',
+  'Какая фраза возвращает тебя в состояние ожидания?',
+  'Что становится доказательством любви, хотя им не является?',
+  'Как выглядит пауза, если записать ее как действие?',
+  'Какая мысль повторяется слишком часто, чтобы быть случайной?',
+]
+
+function createInitialCards(): DeckCard[] {
+  return baseFolders.flatMap((folder, folderIndex) =>
+    Array.from({ length: 20 }, (_, index) => {
+      const number = folderIndex * 20 + index + 1
+      const column = index % 5
+      const row = Math.floor(index / 5)
+
+      return {
+        id: `card-${number}`,
+        folderId: folder.id,
+        title: `Фигура ${String(number).padStart(2, '0')}`,
+        question: prompts[index % prompts.length],
+        backText: 'Здесь можно записать трактовку, пример, сцену или будущую механику карты.',
+        suit: suits[number % suits.length],
+        x: 64 + column * 190,
+        y: 64 + row * 270,
+        flipped: false,
+      } satisfies DeckCard
+    }),
+  )
+}
+
+function createInitialArchive(): ArchiveState {
+  const cards = createInitialCards()
+
+  return {
+    folders: baseFolders,
+    cards,
+    activeFolderId: baseFolders[0].id,
+    selectedCardId: cards[0].id,
+  }
+}
+
+function loadArchiveState(): ArchiveState {
+  if (typeof window === 'undefined') return createInitialArchive()
+
+  try {
+    const stored = window.localStorage.getItem(storageKey)
+    if (!stored) return createInitialArchive()
+
+    const parsed = JSON.parse(stored) as ArchiveState
+    if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.cards)) {
+      return createInitialArchive()
+    }
+
+    return parsed
+  } catch {
+    return createInitialArchive()
+  }
+}
+
+function App() {
+  const boardRef = useRef<HTMLDivElement | null>(null)
+  const initialArchive = useMemo(() => loadArchiveState(), [])
+  const [folders, setFolders] = useState(initialArchive.folders)
+  const [cards, setCards] = useState<DeckCard[]>(initialArchive.cards)
+  const [activeFolderId, setActiveFolderId] = useState(initialArchive.activeFolderId)
+  const [selectedCardId, setSelectedCardId] = useState(initialArchive.selectedCardId)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+
+  const activeFolder = folders.find((folder) => folder.id === activeFolderId)
+  const visibleCards = cards.filter((card) => card.folderId === activeFolderId)
+  const selectedCard = cards.find((card) => card.id === selectedCardId)
+  const cardCountByFolder = useMemo(
+    () =>
+      folders.reduce<Record<string, number>>((acc, folder) => {
+        acc[folder.id] = cards.filter((card) => card.folderId === folder.id).length
+        return acc
+      }, {}),
+    [cards, folders],
+  )
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ folders, cards, activeFolderId, selectedCardId }),
+    )
+  }, [activeFolderId, cards, folders, selectedCardId])
+
+  function updateCard(cardId: string, patch: Partial<DeckCard>) {
+    setCards((current) =>
+      current.map((card) => (card.id === cardId ? { ...card, ...patch } : card)),
+    )
+  }
+
+  function addCard() {
+    const nextNumber = cards.length + 1
+    const newCard: DeckCard = {
+      id: `card-${Date.now()}`,
+      folderId: activeFolderId,
+      title: `Новая карта ${nextNumber}`,
+      question: 'Напиши вопрос или фрагмент, из которого будет собрана карта.',
+      backText: 'Оборотная сторона для заметки, правила или расшифровки.',
+      suit: suits[nextNumber % suits.length],
+      x: 90 + (visibleCards.length % 4) * 210,
+      y: 90 + Math.floor(visibleCards.length / 4) * 270,
+      flipped: false,
+    }
+
+    setCards((current) => [...current, newCard])
+    setSelectedCardId(newCard.id)
+  }
+
+  function deleteSelectedCard() {
+    if (!selectedCard) return
+
+    setCards((current) => current.filter((card) => card.id !== selectedCard.id))
+    setSelectedCardId(cards.find((card) => card.id !== selectedCard.id)?.id ?? '')
+  }
+
+  function addFolder() {
+    const nextFolder = {
+      id: `folder-${Date.now()}`,
+      name: `Новая папка ${folders.length + 1}`,
+    }
+    setFolders((current) => [...current, nextFolder])
+    setActiveFolderId(nextFolder.id)
+  }
+
+  function updateFolderName(folderId: string, name: string) {
+    setFolders((current) =>
+      current.map((folder) => (folder.id === folderId ? { ...folder, name } : folder)),
+    )
+  }
+
+  function startCardDrag(
+    event: React.PointerEvent<HTMLElement>,
+    card: DeckCard,
+  ) {
+    if ((event.target as HTMLElement).closest('button')) return
+
+    const boardElement = boardRef.current
+    const boardRect = boardElement?.getBoundingClientRect()
+    if (!boardElement || !boardRect) return
+    const board = boardElement
+    const rect = boardRect
+
+    setSelectedCardId(card.id)
+    setDraggingId(card.id)
+
+    const offsetX = event.clientX - rect.left + board.scrollLeft - card.x
+    const offsetY = event.clientY - rect.top + board.scrollTop - card.y
+
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    function moveCard(moveEvent: PointerEvent) {
+      const nextX =
+        moveEvent.clientX - rect.left + board.scrollLeft - offsetX
+      const nextY = moveEvent.clientY - rect.top + board.scrollTop - offsetY
+
+      updateCard(card.id, {
+        x: Math.max(24, Math.min(2180, nextX)),
+        y: Math.max(24, Math.min(1450, nextY)),
+      })
+    }
+
+    function stopDrag(upEvent: PointerEvent) {
+      const target = document.elementFromPoint(upEvent.clientX, upEvent.clientY)
+      const folderTarget = target?.closest<HTMLElement>('[data-folder-id]')
+      if (folderTarget) {
+        const folderId = folderTarget.dataset.folderId
+        if (folderId && folderId !== card.folderId) {
+          updateCard(card.id, { folderId, x: 72, y: 72, flipped: false })
+          setActiveFolderId(folderId)
+        }
+      }
+
+      setDraggingId(null)
+      window.removeEventListener('pointermove', moveCard)
+      window.removeEventListener('pointerup', stopDrag)
+    }
+
+    window.addEventListener('pointermove', moveCard)
+    window.addEventListener('pointerup', stopDrag)
+  }
+
+  return (
+    <main className="archive-app">
+      <aside className="sidebar" aria-label="Папки архива">
+        <div className="brand-block">
+          <p>Архив колоды</p>
+          <h1>Фрагменты</h1>
+        </div>
+
+        <button className="text-button" type="button" onClick={addFolder}>
+          + Папка
+        </button>
+
+        <nav className="folder-list" aria-label="Список папок">
+          {folders.map((folder) => (
+            <button
+              className={folder.id === activeFolderId ? 'folder active' : 'folder'}
+              data-folder-id={folder.id}
+              key={folder.id}
+              type="button"
+              onClick={() => setActiveFolderId(folder.id)}
+            >
+              <span>{folder.name}</span>
+              <small>{cardCountByFolder[folder.id] ?? 0}</small>
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      <section className="workspace" aria-label="Рабочий канвас">
+        <header className="topbar">
+          <div>
+            <p>В разработке</p>
+            <h2>{activeFolder?.name}</h2>
+          </div>
+          <div className="toolbar">
+            <span>{cards.length} карт всего</span>
+            <button type="button" onClick={addCard}>
+              + Карта
+            </button>
+          </div>
+        </header>
+
+        <div className="board-frame" ref={boardRef}>
+          <div className="board-canvas">
+            {visibleCards.map((card) => (
+              <article
+                className={[
+                  'deck-card',
+                  card.flipped ? 'flipped' : '',
+                  card.id === selectedCardId ? 'selected' : '',
+                  card.id === draggingId ? 'dragging' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                key={card.id}
+                onPointerDown={(event) => startCardDrag(event, card)}
+                style={{ left: card.x, top: card.y }}
+              >
+                <div className="card-inner">
+                  <div className="card-face card-front">
+                    <span className="suit">{card.suit}</span>
+                    <h3>{card.title}</h3>
+                    <p>{card.question}</p>
+                    <small>перетащи карту или открой в панели</small>
+                  </div>
+                  <div className="card-face card-back">
+                    <span className="suit">оборот</span>
+                    <p>{card.backText}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
-        <div className="visual-placeholder" aria-label="Место для будущего визуала">
-          <div />
-          <div />
-          <div />
-        </div>
       </section>
 
-      <section className="content-section" id="about">
-        <div>
-          <p className="placeholder-label">Блок 01</p>
-          <h2>О проекте</h2>
-        </div>
-        <p>
-          Текст этого блока пока намеренно простой. Сюда можно будет добавить
-          идею, настроение и описание формата игры.
-        </p>
-      </section>
+      <aside className="inspector" aria-label="Редактор карты">
+        {selectedCard ? (
+          <>
+            <div className="inspector-heading">
+              <p>Редактор</p>
+              <h2>{selectedCard.title}</h2>
+            </div>
 
-      <section className="content-section split" id="cards">
-        <div>
-          <p className="placeholder-label">Блок 02</p>
-          <h2>Карточки</h2>
-          <p>
-            Здесь позже появятся примеры карточек, вопросы или описание набора.
-          </p>
-        </div>
-        <div className="card-placeholders" aria-label="Места для карточек">
-          <article />
-          <article />
-          <article />
-        </div>
-      </section>
+            <label>
+              Название
+              <input
+                value={selectedCard.title}
+                onChange={(event) =>
+                  updateCard(selectedCard.id, { title: event.target.value })
+                }
+              />
+            </label>
 
-      <section className="content-section" id="contact">
-        <div>
-          <p className="placeholder-label">Блок 03</p>
-          <h2>Финальный блок</h2>
-        </div>
-        <p>
-          Тут можно будет поставить призыв, форму, ссылку на презентацию или
-          любую информацию для дипломной защиты.
-        </p>
-      </section>
+            <label>
+              Текст лицевой стороны
+              <textarea
+                rows={5}
+                value={selectedCard.question}
+                onChange={(event) =>
+                  updateCard(selectedCard.id, { question: event.target.value })
+                }
+              />
+            </label>
+
+            <label>
+              Оборотная сторона
+              <textarea
+                rows={5}
+                value={selectedCard.backText}
+                onChange={(event) =>
+                  updateCard(selectedCard.id, { backText: event.target.value })
+                }
+              />
+            </label>
+
+            <label>
+              Масть
+              <select
+                value={selectedCard.suit}
+                onChange={(event) =>
+                  updateCard(selectedCard.id, {
+                    suit: event.target.value as CardSuit,
+                  })
+                }
+              >
+                {suits.map((suit) => (
+                  <option key={suit} value={suit}>
+                    {suit}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Папка
+              <select
+                value={selectedCard.folderId}
+                onChange={(event) => {
+                  updateCard(selectedCard.id, { folderId: event.target.value })
+                  setActiveFolderId(event.target.value)
+                }}
+              >
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Название активной папки
+              <input
+                value={activeFolder?.name ?? ''}
+                onChange={(event) =>
+                  updateFolderName(activeFolderId, event.target.value)
+                }
+              />
+            </label>
+
+            <div className="inspector-actions">
+              <button
+                type="button"
+                onClick={() =>
+                  updateCard(selectedCard.id, { flipped: !selectedCard.flipped })
+                }
+              >
+                Перевернуть
+              </button>
+              <button className="danger" type="button" onClick={deleteSelectedCard}>
+                Удалить
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">
+            <h2>Выбери карту</h2>
+            <p>Кликни по карте на канвасе, чтобы редактировать ее текст и папку.</p>
+          </div>
+        )}
+      </aside>
     </main>
   )
 }

@@ -1,16 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Prata&display=swap');
+
 :root {
-  --bg: #fafaf8;
-  --surface: #f2efe8;
-  --text: #55514a;
-  --text-strong: #17140f;
-  --muted: #8d857a;
-  --border: #e1ddd3;
-  --border-strong: #c8c0b4;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  color: var(--text);
-  background: var(--bg);
+  --paper: #eaeae8;
+  --panel: #e1d8d9;
+  --rose: #eadfe1;
+  --ink: #1f1d1c;
+  --muted: #716b68;
+  --line: rgba(31, 29, 28, 0.16);
+  --line-strong: rgba(31, 29, 28, 0.34);
+  --accent: #988b8f;
+  --display: 'Prata', Georgia, serif;
+  --body: 'Inter', system-ui, sans-serif;
+  font-family: var(--body);
+  color: var(--ink);
+  background: var(--paper);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,11 +24,14 @@
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
 body {
   min-width: 320px;
   margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
