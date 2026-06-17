@@ -152,10 +152,12 @@ function getFolderInitial(name: string) {
 }
 
 function getTitleDensityClass(title: string) {
+  const words = title.trim().split(/\s+/)
   const titleLength = Array.from(title.trim()).length
+  const longestWordLength = Math.max(...words.map((word) => Array.from(word).length), 0)
 
-  if (titleLength > 64) return 'dense-title'
-  if (titleLength > 36) return 'long-title'
+  if (titleLength > 52 || longestWordLength > 14) return 'dense-title'
+  if (titleLength > 28 || longestWordLength > 8) return 'long-title'
 
   return ''
 }
