@@ -6,15 +6,13 @@ type Folder = {
   name: string
 }
 
-type CardSuit = 'речь' | 'жест' | 'пауза' | 'письмо' | 'взгляд'
-
 type DeckCard = {
   id: string
   folderId: string
   title: string
   question: string
   backText: string
-  suit: CardSuit
+  suit: string
   x: number
   y: number
   flipped: boolean
@@ -23,11 +21,14 @@ type DeckCard = {
 type ArchiveState = {
   folders: Folder[]
   cards: DeckCard[]
+  suits: string[]
   activeFolderId: string
   selectedCardId: string
 }
 
-const suits: CardSuit[] = ['речь', 'жест', 'пауза', 'письмо', 'взгляд']
+type ImportArchive = Partial<ArchiveState>
+
+const defaultSuits = ['речь', 'жест', 'пауза', 'письмо', 'взгляд']
 const storageKey = 'fragments-archive-state-v4'
 
 const baseFolders: Folder[] = [
@@ -59,7 +60,7 @@ function createInitialCards(): DeckCard[] {
         title: `Фигура ${String(number).padStart(2, '0')}`,
         question: prompts[index % prompts.length],
         backText: 'Здесь можно записать трактовку, пример, сцену или будущую механику карты.',
-        suit: suits[number % suits.length],
+        suit: defaultSuits[number % defaultSuits.length],
         x: 64 + column * 190,
         y: 64 + row * 270,
         flipped: false,
@@ -74,8 +75,45 @@ function createInitialArchive(): ArchiveState {
   return {
     folders: baseFolders,
     cards,
+    suits: defaultSuits,
     activeFolderId: baseFolders[0].id,
     selectedCardId: cards[0].id,
+  }
+}
+
+function normalizeSuits(rawSuits: unknown, cards: DeckCard[]) {
+  const storedSuits = Array.isArray(rawSuits)
+    ? rawSuits.filter(
+        (suit): suit is string => typeof suit === 'string' && suit.trim().length > 0,
+      )
+    : []
+  const cardSuits = cards.map((card) => card.suit).filter((suit) => suit.trim().length > 0)
+  const uniqueSuits = Array.from(new Set([...storedSuits, ...cardSuits, ...defaultSuits]))
+
+  return uniqueSuits.length > 0 ? uniqueSuits : defaultSuits
+}
+
+function normalizeArchiveState(parsed: ImportArchive): ArchiveState {
+  const fallback = createInitialArchive()
+  const folders = Array.isArray(parsed.folders) ? parsed.folders : fallback.folders
+  const cards = Array.isArray(parsed.cards) ? parsed.cards : fallback.cards
+  const activeFolderId =
+    typeof parsed.activeFolderId === 'string' &&
+    folders.some((folder) => folder.id === parsed.activeFolderId)
+      ? parsed.activeFolderId
+      : folders[0]?.id ?? ''
+  const selectedCardId =
+    typeof parsed.selectedCardId === 'string' &&
+    cards.some((card) => card.id === parsed.selectedCardId)
+      ? parsed.selectedCardId
+      : cards.find((card) => card.folderId === activeFolderId)?.id ?? cards[0]?.id ?? ''
+
+  return {
+    folders,
+    cards,
+    suits: normalizeSuits(parsed.suits, cards),
+    activeFolderId,
+    selectedCardId,
   }
 }
 
@@ -86,34 +124,60 @@ function loadArchiveState(): ArchiveState {
     const stored = window.localStorage.getItem(storageKey)
     if (!stored) return createInitialArchive()
 
-    const parsed = JSON.parse(stored) as ArchiveState
+    const parsed = JSON.parse(stored) as ImportArchive
     if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.cards)) {
       return createInitialArchive()
     }
 
-    return parsed
+    return normalizeArchiveState(parsed)
   } catch {
     return createInitialArchive()
   }
+}
+
+function downloadArchive(state: ArchiveState) {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {
+    type: 'application/json',
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `question-cards-workspace-${new Date().toISOString().slice(0, 10)}.json`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function getFolderInitial(name: string) {
   return Array.from(name.trim())[0]?.toLocaleUpperCase('ru-RU') ?? '•'
 }
 
+function getTitleDensityClass(title: string) {
+  const titleLength = Array.from(title.trim()).length
+
+  if (titleLength > 64) return 'dense-title'
+  if (titleLength > 36) return 'long-title'
+
+  return ''
+}
+
 function App() {
   const boardRef = useRef<HTMLDivElement | null>(null)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
   const initialArchive = useMemo(() => loadArchiveState(), [])
   const [folders, setFolders] = useState(initialArchive.folders)
   const [cards, setCards] = useState<DeckCard[]>(initialArchive.cards)
+  const [suits, setSuits] = useState(initialArchive.suits)
   const [activeFolderId, setActiveFolderId] = useState(initialArchive.activeFolderId)
   const [selectedCardId, setSelectedCardId] = useState(initialArchive.selectedCardId)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
+  const [pendingDeleteFolderId, setPendingDeleteFolderId] = useState<string | null>(null)
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false)
+  const [importStatus, setImportStatus] = useState('')
 
   const activeFolder = folders.find((folder) => folder.id === activeFolderId)
+  const pendingDeleteFolder = folders.find((folder) => folder.id === pendingDeleteFolderId)
   const visibleCards = cards.filter((card) => card.folderId === activeFolderId)
   const selectedCard = cards.find((card) => card.id === selectedCardId)
   const cardCountByFolder = useMemo(
@@ -128,9 +192,9 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(
       storageKey,
-      JSON.stringify({ folders, cards, activeFolderId, selectedCardId }),
+      JSON.stringify({ folders, cards, suits, activeFolderId, selectedCardId }),
     )
-  }, [activeFolderId, cards, folders, selectedCardId])
+  }, [activeFolderId, cards, folders, selectedCardId, suits])
 
   function updateCard(cardId: string, patch: Partial<DeckCard>) {
     setCards((current) =>
@@ -199,6 +263,97 @@ function App() {
         ? current
         : cards.find((card) => card.folderId !== folderId)?.id ?? ''
     })
+  }
+
+  function addSuit() {
+    const nextSuit = `Новая масть ${suits.length + 1}`
+    setSuits((current) => [...current, nextSuit])
+    if (selectedCard) {
+      updateCard(selectedCard.id, { suit: nextSuit })
+    }
+  }
+
+  function updateSuitName(index: number, name: string) {
+    const currentSuit = suits[index]
+    if (currentSuit === undefined) return
+
+    setSuits((current) =>
+      current.map((suit, suitIndex) => (suitIndex === index ? name : suit)),
+    )
+    setCards((current) =>
+      current.map((card) => (card.suit === currentSuit ? { ...card, suit: name } : card)),
+    )
+  }
+
+  function deleteSuit(index: number) {
+    if (suits.length <= 1) return
+
+    const removedSuit = suits[index]
+    const fallbackSuit = suits.find((_, suitIndex) => suitIndex !== index) ?? defaultSuits[0]
+    setSuits((current) => current.filter((_, suitIndex) => suitIndex !== index))
+    setCards((current) =>
+      current.map((card) =>
+        card.suit === removedSuit ? { ...card, suit: fallbackSuit } : card,
+      ),
+    )
+  }
+
+  function exportWorkspace() {
+    downloadArchive({ folders, cards, suits, activeFolderId, selectedCardId })
+  }
+
+  function mergeImportedArchive(imported: ArchiveState) {
+    const stamp = Date.now()
+    const folderIdMap = new Map(
+      imported.folders.map((folder, index) => [
+        folder.id,
+        `folder-import-${stamp}-${index}`,
+      ]),
+    )
+    const importedFolders = imported.folders.map((folder, index) => ({
+      ...folder,
+      id: folderIdMap.get(folder.id) ?? `folder-import-${stamp}-${index}`,
+      name: `${folder.name} · импорт`,
+    }))
+    const importedCards = imported.cards
+      .filter((card) => folderIdMap.has(card.folderId))
+      .map((card, index) => ({
+        ...card,
+        id: `card-import-${stamp}-${index}`,
+        folderId: folderIdMap.get(card.folderId) ?? importedFolders[0]?.id ?? '',
+      }))
+
+    setFolders((current) => [...current, ...importedFolders])
+    setCards((current) => [...current, ...importedCards])
+    setSuits((current) => Array.from(new Set([...current, ...imported.suits])))
+
+    const nextActiveFolderId = importedFolders[0]?.id
+    if (nextActiveFolderId) setActiveFolderId(nextActiveFolderId)
+    if (importedCards[0]) setSelectedCardId(importedCards[0].id)
+
+    setImportStatus(
+      `Импортировано: ${importedFolders.length} папок, ${importedCards.length} карт`,
+    )
+  }
+
+  function importWorkspace(file: File | undefined) {
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result)) as ImportArchive
+        if (!Array.isArray(parsed.folders) || !Array.isArray(parsed.cards)) {
+          setImportStatus('Не получилось импортировать: файл не похож на архив')
+          return
+        }
+
+        mergeImportedArchive(normalizeArchiveState(parsed))
+      } catch {
+        setImportStatus('Не получилось импортировать: файл поврежден')
+      }
+    }
+    reader.readAsText(file)
   }
 
   function startCardDrag(
@@ -312,7 +467,7 @@ function App() {
                     type="button"
                     aria-label={`Удалить папку ${folder.name}`}
                     disabled={folders.length <= 1}
-                    onClick={() => deleteFolder(folder.id)}
+                    onClick={() => setPendingDeleteFolderId(folder.id)}
                   >
                     Удалить
                   </button>
@@ -345,9 +500,26 @@ function App() {
           <div className="toolbar">
             <span>{cards.length} карт всего</span>
             <span>{visibleCards.length} здесь</span>
+            {importStatus ? <span className="import-status">{importStatus}</span> : null}
             <button type="button" onClick={addCard}>
               + Карта
             </button>
+            <button type="button" onClick={exportWorkspace}>
+              Экспорт
+            </button>
+            <button type="button" onClick={() => importInputRef.current?.click()}>
+              Импорт
+            </button>
+            <input
+              ref={importInputRef}
+              className="visually-hidden"
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => {
+                importWorkspace(event.target.files?.[0])
+                event.currentTarget.value = ''
+              }}
+            />
             <button
               className="mobile-editor-button"
               type="button"
@@ -368,6 +540,7 @@ function App() {
                   card.flipped ? 'flipped' : '',
                   card.id === selectedCardId ? 'selected' : '',
                   card.id === draggingId ? 'dragging' : '',
+                  getTitleDensityClass(card.title),
                 ]
                   .filter(Boolean)
                   .join(' ')}
@@ -473,7 +646,7 @@ function App() {
                   value={selectedCard.suit}
                   onChange={(event) =>
                     updateCard(selectedCard.id, {
-                      suit: event.target.value as CardSuit,
+                      suit: event.target.value,
                     })
                   }
                 >
@@ -503,6 +676,34 @@ function App() {
               </label>
             </div>
 
+            <section className="suit-manager" aria-label="Редактирование мастей">
+              <div className="suit-manager-heading">
+                <strong>Масти</strong>
+                <button type="button" onClick={addSuit}>
+                  + Масть
+                </button>
+              </div>
+              <div className="suit-list">
+                {suits.map((suit, index) => (
+                  <div className="suit-row" key={`${suit}-${index}`}>
+                    <input
+                      aria-label={`Название масти ${index + 1}`}
+                      value={suit}
+                      onChange={(event) => updateSuitName(index, event.target.value)}
+                    />
+                    <button
+                      className="mini-button danger"
+                      type="button"
+                      disabled={suits.length <= 1}
+                      onClick={() => deleteSuit(index)}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             <div className="gameplay-note">
               <strong>Как это читать:</strong>
               <span>лицевая сторона — карточка для игры; оборот — авторская заметка, правило или расшифровка.</span>
@@ -529,6 +730,44 @@ function App() {
           </div>
         )}
       </aside>
+
+      {pendingDeleteFolder ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={() => setPendingDeleteFolderId(null)}
+        >
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-folder-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <p>Удаление папки</p>
+            <h2 id="delete-folder-title">Точно удалить «{pendingDeleteFolder.name}»?</h2>
+            <span>
+              Внутри {cardCountByFolder[pendingDeleteFolder.id] ?? 0} карт. Они тоже
+              удалятся из этой рабочей области.
+            </span>
+            <div className="confirm-actions">
+              <button type="button" onClick={() => setPendingDeleteFolderId(null)}>
+                Отмена
+              </button>
+              <button
+                className="danger"
+                type="button"
+                onClick={() => {
+                  deleteFolder(pendingDeleteFolder.id)
+                  setPendingDeleteFolderId(null)
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   )
 }

@@ -69,7 +69,9 @@
 .text-button,
 .toolbar button,
 .inspector-actions button,
-.side-switch button {
+.side-switch button,
+.suit-manager-heading button,
+.confirm-actions button {
   min-height: 38px;
   border: 1px solid var(--ink);
   border-radius: 4px;
@@ -83,7 +85,9 @@
 .text-button:hover,
 .toolbar button:hover,
 .inspector-actions button:hover,
-.side-switch button:hover {
+.side-switch button:hover,
+.suit-manager-heading button:hover,
+.confirm-actions button:hover {
   background: var(--ink);
   color: var(--paper);
 }
@@ -266,6 +270,7 @@
 .toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   color: var(--muted);
   font-size: 13px;
@@ -273,6 +278,24 @@
 
 .toolbar button {
   padding: 0 14px;
+}
+
+.import-status {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .mobile-editor-button,
@@ -373,11 +396,37 @@
 }
 
 .card-face h3 {
+  display: -webkit-box;
   margin: 8px 0 0;
+  overflow: hidden;
   font-family: var(--display);
   font-size: 23px;
   font-weight: 400;
   line-height: 1.05;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.deck-card.long-title .card-face h3 {
+  font-size: 18px;
+  line-height: 1.1;
+  -webkit-line-clamp: 5;
+}
+
+.deck-card.long-title .card-front p {
+  -webkit-line-clamp: 4;
+}
+
+.deck-card.dense-title .card-face h3 {
+  font-size: 14px;
+  line-height: 1.12;
+  -webkit-line-clamp: 7;
+}
+
+.deck-card.dense-title .card-front p {
+  -webkit-line-clamp: 2;
 }
 
 .card-face p {
@@ -387,6 +436,8 @@
   color: var(--ink);
   font-size: 13px;
   line-height: 1.42;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 6;
 }
@@ -415,6 +466,8 @@
 .inspector-heading h2,
 .empty-state h2 {
   font-size: 29px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .side-status {
@@ -451,6 +504,46 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.suit-manager {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.suit-manager-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.suit-manager-heading strong {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.suit-manager-heading button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.suit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.suit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .inspector input,
@@ -507,6 +600,67 @@
 }
 
 .inspector-actions .danger:hover {
+  color: #fff;
+  background: #8e3d34;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(31, 29, 28, 0.34);
+  z-index: 80;
+}
+
+.confirm-modal {
+  display: grid;
+  gap: 12px;
+  width: min(420px, 100%);
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 24px 70px rgba(31, 29, 28, 0.24);
+}
+
+.confirm-modal p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.confirm-modal h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.08;
+}
+
+.confirm-modal span {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.confirm-actions .danger {
+  border-color: #8e3d34;
+  color: #8e3d34;
+}
+
+.confirm-actions .danger:hover {
   color: #fff;
   background: #8e3d34;
 }
@@ -718,6 +872,26 @@
     font-size: 17px;
   }
 
+  .deck-card.long-title .card-face h3 {
+    font-size: 13px;
+    line-height: 1.1;
+    -webkit-line-clamp: 5;
+  }
+
+  .deck-card.long-title .card-front p {
+    -webkit-line-clamp: 3;
+  }
+
+  .deck-card.dense-title .card-face h3 {
+    font-size: 11px;
+    line-height: 1.12;
+    -webkit-line-clamp: 7;
+  }
+
+  .deck-card.dense-title .card-front p {
+    -webkit-line-clamp: 2;
+  }
+
   .card-face p {
     font-size: 10.5px;
     line-height: 1.38;
@@ -796,7 +970,12 @@
   }
 
   .field-grid,
-  .inspector-actions {
+  .inspector-actions,
+  .confirm-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .suit-row {
     grid-template-columns: 1fr;
   }
 
